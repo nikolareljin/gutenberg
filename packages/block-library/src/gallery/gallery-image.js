@@ -2,6 +2,7 @@
  * External dependencies
  */
 import classnames from 'classnames';
+import { debounce } from 'lodash';
 
 /**
  * WordPress dependencies
@@ -18,10 +19,22 @@ class GalleryImage extends Component {
 	constructor() {
 		super( ...arguments );
 
+		this.onBlur = this.onBlur.bind( this );
+		this.onFocus = this.onFocus.bind( this );
 		this.onImageClick = this.onImageClick.bind( this );
 		this.onSelectCaption = this.onSelectCaption.bind( this );
 		this.onKeyDown = this.onKeyDown.bind( this );
 		this.bindContainer = this.bindContainer.bind( this );
+
+		// debouncedOnSelect will be called every time any figure's element
+		// is blurred. Every time a figure's element is focused, it'll be cancelled.
+		//
+		// We use this to detect whether the figure element has lost focus permanently
+		// or the change was internal (a focus transition from image to caption, for example).
+		//
+		// onBlur / onFocus events are quick operations (<5ms apart in my testing),
+		// so 50ms accounts for 10x lagging while feels responsive to the user.
+		this.debouncedOnDeselect = debounce( this.props.onDeselect, 50 );
 
 		this.state = {
 			captionSelected: false,
@@ -85,6 +98,14 @@ class GalleryImage extends Component {
 		}
 	}
 
+	onBlur() {
+		this.debouncedOnDeselect();
+	}
+
+	onFocus() {
+		this.debouncedOnDeselect.cancel();
+	}
+
 	render() {
 		const { url, alt, id, linkTo, link, isSelected, caption, onRemove, setAttributes, 'aria-label': ariaLabel } = this.props;
 
@@ -127,7 +148,14 @@ class GalleryImage extends Component {
 		// Disable reason: Each block can be selected by clicking on it and we should keep the same saved markup
 		/* eslint-disable jsx-a11y/no-noninteractive-element-interactions, jsx-a11y/onclick-has-role, jsx-a11y/click-events-have-key-events */
 		return (
-			<figure className={ className } tabIndex="-1" onKeyDown={ this.onKeyDown } ref={ this.bindContainer }>
+			<figure
+				className={ className }
+				tabIndex="-1"
+				onBlur={ this.onBlur }
+				onFocus={ this.onFocus }
+				onKeyDown={ this.onKeyDown }
+				ref={ this.bindContainer }
+			>
 				{ isSelected &&
 					<div className="block-library-gallery-item__inline-menu">
 						<IconButton
